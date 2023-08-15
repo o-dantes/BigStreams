@@ -45,6 +45,7 @@ private:
 };
 
 std::string TimestampToDate(time_t timestamp);
+int GivePos(const std::vector<Element>& elements,const Element& elem);
 
 int main()
 {
@@ -194,7 +195,7 @@ Storage::~Storage()
 {
     //vectors will be automatically deallocated
 }
-
+// Solution 5.1
 int Storage::Loader(const Element& elem)
 {
 #ifndef REL
@@ -207,9 +208,9 @@ int Storage::Loader(const Element& elem)
     {
            _new.insert(_new.begin(), elem);
     }
-    
+
 #endif
-    
+
 #ifdef REL
     if(_new.empty|| elem.GetTime() < _new[0].GetTime())
     {
@@ -225,10 +226,27 @@ int Storage::Loader(const Element& elem)
     return 0;
 }
 
+//Solution 5.3
+//int Storage::Loader(const Element& elem)
+//{
+//#ifndef REL
+//
+//    _new.insert(_new.begin()+GivePos(_new, elem),elem);
+//
+//#endif
+//
+//#ifdef REL
+//    _new.insert(_new.begin()+GivePos(_new, elem),elem);
+//    _old.insert(_old.begin()+GivePos(_old, elem),elem);
+//#endif
+//    return 0;
+//}
+
 int Storage::Copier()
 {
     if (!_old.empty() && !_new.empty())
     {
+        //reverse for Solution 5.1
         std::reverse(_old.begin(),_old.end());
         for (Element& elem : _old)
         {
@@ -305,4 +323,48 @@ void Storage::ShowStorage(int choose)
             elem.Show();
         }
     }
+}
+
+//O(N)
+//int GivePos(const std::vector<Element>& elements,const Element& elem)
+//{
+//    for (int i = 0; i < elements.size(); ++i)
+//    {
+//        if (elements[i].GetTime() <= elem.GetTime() && (i == elements.size() - 1 || elements[i + 1].GetTime() > elem.GetTime()))
+//        {
+//            return i + 1;
+//        }
+//    }
+//
+//    return 0;
+//}
+
+//O(LogN)
+int GivePos(const std::vector<Element>& elements,const Element& elem)
+{
+    int low = 0;
+    int high = elements.size();
+
+    while (low < high)
+    {
+        int mid = low + (high - low) / 2;
+
+        if (elements[mid].GetTime() <= elem.GetTime())
+        {
+            if (mid == elements.size() - 1 || elements[mid + 1].GetTime() > elem.GetTime())
+            {
+                return mid+1;
+            }
+            else
+            {
+                low = mid+1;
+            }
+        }
+        else
+        {
+            high = mid;
+        }
+    }
+
+    return 0;
 }
