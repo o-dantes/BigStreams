@@ -5,6 +5,7 @@
 #include <string>
 #include <thread>
 #include "algorithm"
+#include "atomic"
 //#define REL
 #define TEST
 
@@ -13,7 +14,7 @@ class Element
 public:
     Element();
     Element(time_t time, int value);
-    Element(long);//to handle NULL as passing argument
+    Element(long timestamp);//to handle NULL as passing argument
     Element(int value);
     int SetValue(int value);//undone
     int SetTimeSt(time_t time);//undone
@@ -33,7 +34,8 @@ public:
     Storage();
     Storage(std::vector<Element>& old, std::vector<Element>& neW);
     ~Storage();// empty
-    int Loader(const Element& elem);//adds to storage (for new or for both ifdef REl)
+    int Loader(const Element& elem);//adds to storage (for new or for both ifdef REL)
+    int Loader(long timestamp);//for use by a Copier
     int Copier();//copies from one vector(storage) to another
     std::vector<Element> GetLogs(time_t start, time_t finish);//gives all elements with timestamps between start and finish
     Element GetLatest();//returns element with the biggest timestamp
@@ -46,6 +48,7 @@ private:
 
 std::string TimestampToDate(time_t timestamp);
 int GivePos(const std::vector<Element>& elements,const Element& elem);
+std::atomic <bool> CopyingFinished(false);
 
 int main()
 {
@@ -99,9 +102,9 @@ Element::Element()
     _value = 0;
 }
 
-Element::Element(long)
+Element::Element(long timestamp)
 {
-    _timestamp=0;
+    _timestamp=timestamp;
     _value=0;
 }
 
@@ -164,15 +167,6 @@ Element Storage::GetLatest()
 std::vector<Element> Storage::GetLogs(time_t start, time_t finish)
 {
     std::vector<Element> dates;
-    /*
-    for (Element& elem : _old)
-    {
-        if (elem.GetTime() >= start && elem.GetTime() <= finish)
-        {
-            dates.push_back(elem);
-        }
-    }
-    */
     for (Element& elem : _new)
     {
         if (elem.GetTime() >= start && elem.GetTime() <= finish)
@@ -180,7 +174,16 @@ std::vector<Element> Storage::GetLogs(time_t start, time_t finish)
             dates.push_back(elem);
         }
     }
-
+    if(!CopyingFinished)
+    {
+        for (Element& elem : _old)
+        {
+            if (elem.GetTime() >= start && elem.GetTime() <= finish)
+            {
+                dates.push_back(elem);
+            }
+        }
+    }
     return dates;
 }
 
@@ -195,37 +198,26 @@ Storage::~Storage()
 {
     //vectors will be automatically deallocated
 }
-// Solution 5.1
+// Solution 5.1 (Add on top)
 int Storage::Loader(const Element& elem)
 {
 #ifndef REL
-
-    if (_new.empty() || elem.GetTime() < _new[0].GetTime())
-    {
-        _new.push_back(elem);
-    }
-    else
-    {
-           _new.insert(_new.begin(), elem);
-    }
-
+    _new.insert(_new.begin(), elem);
 #endif
 
 #ifdef REL
-    if(_new.empty|| elem.GetTime() < _new[0].GetTime())
-    {
-        _new.push_back(elem);
-        _old.push_back(elem);
-    }
-    else
-    {
-        _new.insert(_new.begin(),elem);
-        _old.push_back(elem);
-    }
+    _new.insert(_new.begin(),elem);
+    _old.push_back(elem);
 #endif
     return 0;
 }
 
+//Solution 5.1 (for use by a Copier)
+int Storage::Loader(long timestamp)
+{
+    _new.push_back(Element(timestamp));
+    return 0;
+}
 //Solution 5.3
 //int Storage::Loader(const Element& elem)
 //{
@@ -250,13 +242,14 @@ int Storage::Copier()
         std::reverse(_old.begin(),_old.end());
         for (Element& elem : _old)
         {
-            Loader(elem);
+            Loader(elem.GetTime()); // passing timestamp
         }
     }
     else
     {
         return 1; // Non-existing vectors
     }
+    CopyingFinished.store(true);
     return 0;
      
 }
@@ -368,3 +361,4 @@ int GivePos(const std::vector<Element>& elements,const Element& elem)
 
     return 0;
 }
+
