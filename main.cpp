@@ -22,7 +22,7 @@ public:
     int SetTimeSt(time_t time);//undone
     time_t GetTime() const;//return _timestamp
     int GetValue();
-    void Show();//prints "_timestamp value \n"
+    void Show();
     Element operator=(const Element& other);//to compare
     bool operator!=(const Element& other);//to compare
 private:
