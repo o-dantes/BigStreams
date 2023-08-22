@@ -36,9 +36,9 @@ public:
     Storage();
     Storage(std::vector<Element>& old, std::vector<Element>& neW);
     ~Storage();// empty
-//    time_t Loader(int value);//5.1 adds to storage (for new or for both ifdef REL)
-//    int Loader(time_t timestamp);//5.1 for use by a Copier
-    int Loader(time_t timestamp);//5.3 solution
+    time_t Loader(int value);//5.1 adds to storage (for new or for both ifdef REL)
+    int Loader(time_t timestamp);//5.1 for use by a Copier
+   // int Loader(time_t timestamp);//5.3 solution
     int Copier();//copies from one vector(storage) to another
     std::vector<Element> GetLogs(time_t start, time_t finish);//gives all elements with timestamps between start and finish
     Element GetLatest();//returns element with the biggest timestamp
@@ -114,6 +114,7 @@ Element::Element(long timestamp)
     INDEX++;
 }
 
+
 Element::Element(int value)
 {
     std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
@@ -173,15 +174,18 @@ Element Storage::GetLatest()
     return *maxElem;
 }
 
-
 std::vector<Element> Storage::GetLogs(time_t start, time_t finish)
 {
     std::vector<Element> dates;
+    if(finish<start)
+    {
+        std::swap(start,finish);
+    }
     for (Element& elem : _new)
     {
         if (elem.GetTime() >= start && elem.GetTime() <= finish)
         {
-            dates.push_back(elem);
+                dates.insert(dates.begin()+GivePos(dates, elem.GetTime()), elem);
         }
     }
     if(!CopyingFinished)
@@ -190,13 +194,12 @@ std::vector<Element> Storage::GetLogs(time_t start, time_t finish)
         {
             if (elem.GetTime() >= start && elem.GetTime() <= finish)
             {
-                    dates.push_back(elem);
+                    dates.insert(dates.begin()+GivePos(dates, elem.GetTime()), elem);
             }
         }
     }
     return dates;
 }
-
 
 Storage::Storage(std::vector<Element>& old, std::vector<Element>& neW)
 {
@@ -209,41 +212,41 @@ Storage::~Storage()
     //vectors will be automatically deallocated
 }
 // Solution 5.1 (Add on top)
-//time_t Storage::Loader(int value)
-//{
-//#ifndef REL
-//    _new.insert(_new.begin(), Element(value));
-//#endif
-//
-//#ifdef REL
-//    _new.insert(_new.begin(),Element(value));
-//    _old.push_back(Element(value));
-//#endif
-//    return _new.begin()->GetTime();
-//}
-
-//Solution 5.1 (for use by a Copier)
-//int Storage::Loader(time_t timestamp)
-//{
-//    _new.push_back(Element(timestamp));
-//    return 0;
-//}
-
-//Solution 5.3
-int Storage::Loader(time_t timestamp)
+time_t Storage::Loader(int value)
 {
 #ifndef REL
-
-    _new.insert(_new.begin()+GivePos(_new, timestamp),Element(timestamp));
-
+    _new.insert(_new.begin(), Element(value));
 #endif
 
 #ifdef REL
-    _new.insert(_new.begin()+GivePos(_new, timestamp),Element(timestamp));
-    _old.insert(_old.begin()+GivePos(_old, timestamp),Element(timestamp));
+    _new.insert(_new.begin(),Element(value));
+    _old.push_back(Element(value));
 #endif
-    return GivePos(_new, timestamp);
+    return _new.begin()->GetTime();
 }
+
+//Solution 5.1 (for use by a Copier)
+int Storage::Loader(time_t timestamp)
+{
+    _new.push_back(Element(timestamp));
+    return 0;
+}
+
+//Solution 5.3
+//int Storage::Loader(time_t timestamp)
+//{
+//#ifndef REL
+//
+//    _new.insert(_new.begin()+GivePos(_new, timestamp),Element(timestamp));
+//
+//#endif
+//
+//#ifdef REL
+//    _new.insert(_new.begin()+GivePos(_new, timestamp),Element(timestamp));
+//    _old.insert(_old.begin()+GivePos(_old, timestamp),Element(timestamp));
+//#endif
+//    return GivePos(_new, timestamp);
+//}
 
 int Storage::Copier()
 {
@@ -302,10 +305,10 @@ void Storage::AddNewEES(int r_from,int r_to)
     
     while (value <= r_to)
     {
-        //Loader(value);//5.1
+        Loader(value);//5.1
         std::chrono::system_clock::time_point now = std::chrono::system_clock::now();//5.3
         timestamp = std::chrono::system_clock::to_time_t(now);//5.3
-        Loader(timestamp);//5.3
+        //Loader(timestamp);//5.3
 
         
         value++;
