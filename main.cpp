@@ -17,6 +17,7 @@ public:
     Element(time_t time, int value);
     Element(time_t timestamp);
     Element(int value);
+    ~Element();
     int SetValue(int value);//undone
     int SetTimeSt(time_t time);//undone
     time_t GetTime() const;//return _timestamp
@@ -103,6 +104,7 @@ Element::Element()
     std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
     _timestamp = std::chrono::system_clock::to_time_t(now);
     _value = INDEX;
+    INDEX++;
 }
 
 Element::Element(long timestamp)
@@ -126,6 +128,10 @@ Element::Element(time_t time, int value)
     _value=value;
 }
 
+Element::~Element()
+{
+    //INDEX-- ???
+}
 void Element::Show()
 {
     std::cout << _timestamp << " " << _value << std::endl;
@@ -175,14 +181,7 @@ std::vector<Element> Storage::GetLogs(time_t start, time_t finish)
     {
         if (elem.GetTime() >= start && elem.GetTime() <= finish)
         {
-            if(dates.empty()||dates[0].GetTime()<elem.GetTime())
-            {
-                dates.push_back(elem);
-            }
-            else
-            {
-                dates.insert(dates.begin(), elem);
-            }
+            dates.push_back(elem);
         }
     }
     if(!CopyingFinished)
@@ -191,14 +190,7 @@ std::vector<Element> Storage::GetLogs(time_t start, time_t finish)
         {
             if (elem.GetTime() >= start && elem.GetTime() <= finish)
             {
-                if(dates.empty()||dates[0].GetTime()<elem.GetTime())
-                {
                     dates.push_back(elem);
-                }
-                else
-                {
-                    dates.insert(dates.begin(), elem);
-                }
             }
         }
     }
@@ -261,8 +253,7 @@ int Storage::Copier()
         //std::reverse(_old.begin(),_old.end());//5.1
         for (Element& elem : _old)
         {
-            Loader(elem.GetTime()); // 5.1 passing timestamp
-            //Loader(elem.GetValue()); // 5.3 passing value
+            Loader(elem.GetTime()); // passing timestamp
         }
     }
     else
@@ -282,9 +273,10 @@ std::string TimestampToDate(time_t timestamp)
     if (timeinfo != nullptr && std::strftime(buffer, sizeof(buffer), "%d.%m.%Y", timeinfo))
     {
         return std::string(buffer);
-    } else
+    }
+    else
     {
-        return "Invalid Timestamp"; // Handle error case
+        return "Invalid Timestamp";
     }
 }
 
