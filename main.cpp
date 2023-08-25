@@ -9,18 +9,20 @@
 //#define REL
 #define TEST
 
+
 class Element
 {
 public:
     Element();
     Element(time_t time, int value);
-    Element(long timestamp);//to handle NULL as passing argument
+    Element(time_t timestamp);
     Element(int value);
+    ~Element();
     int SetValue(int value);//undone
     int SetTimeSt(time_t time);//undone
     time_t GetTime() const;//return _timestamp
     int GetValue();
-    void Show();//prints "_timestamp value \n"
+    void Show();
     Element operator=(const Element& other);//to compare
     bool operator!=(const Element& other);//to compare
 private:
@@ -34,8 +36,9 @@ public:
     Storage();
     Storage(std::vector<Element>& old, std::vector<Element>& neW);
     ~Storage();// empty
-    int Loader(const Element& elem);//adds to storage (for new or for both ifdef REL)
-    int Loader(long timestamp);//for use by a Copier
+    time_t Loader(int value);//5.1 adds to storage (for new or for both ifdef REL)
+    int Loader(time_t timestamp);//5.1 for use by a Copier
+   // int Loader(time_t timestamp);//5.3 solution
     int Copier();//copies from one vector(storage) to another
     std::vector<Element> GetLogs(time_t start, time_t finish);//gives all elements with timestamps between start and finish
     Element GetLatest();//returns element with the biggest timestamp
@@ -47,8 +50,9 @@ private:
 };
 
 std::string TimestampToDate(time_t timestamp);
-int GivePos(const std::vector<Element>& elements,const Element& elem);
+int GivePos(const std::vector<Element>& elements,time_t timestamp);
 std::atomic <bool> CopyingFinished(false);
+int INDEX = 0;
 
 int main()
 {
@@ -99,14 +103,17 @@ Element::Element()
 {
     std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
     _timestamp = std::chrono::system_clock::to_time_t(now);
-    _value = 0;
+    _value = INDEX;
+    INDEX++;
 }
 
 Element::Element(long timestamp)
 {
     _timestamp=timestamp;
-    _value=0;
+    _value=INDEX;
+    INDEX++;
 }
+
 
 Element::Element(int value)
 {
@@ -122,6 +129,10 @@ Element::Element(time_t time, int value)
     _value=value;
 }
 
+Element::~Element()
+{
+    //INDEX-- ???
+}
 void Element::Show()
 {
     std::cout << _timestamp << " " << _value << std::endl;
@@ -163,15 +174,18 @@ Element Storage::GetLatest()
     return *maxElem;
 }
 
-
 std::vector<Element> Storage::GetLogs(time_t start, time_t finish)
 {
     std::vector<Element> dates;
+    if(finish<start)
+    {
+        std::swap(start,finish);
+    }
     for (Element& elem : _new)
     {
         if (elem.GetTime() >= start && elem.GetTime() <= finish)
         {
-            dates.push_back(elem);
+                dates.insert(dates.begin()+GivePos(dates, elem.GetTime()), elem);
         }
     }
     if(!CopyingFinished)
@@ -180,13 +194,12 @@ std::vector<Element> Storage::GetLogs(time_t start, time_t finish)
         {
             if (elem.GetTime() >= start && elem.GetTime() <= finish)
             {
-                dates.push_back(elem);
+                    dates.insert(dates.begin()+GivePos(dates, elem.GetTime()), elem);
             }
         }
     }
     return dates;
 }
-
 
 Storage::Storage(std::vector<Element>& old, std::vector<Element>& neW)
 {
@@ -199,39 +212,40 @@ Storage::~Storage()
     //vectors will be automatically deallocated
 }
 // Solution 5.1 (Add on top)
-int Storage::Loader(const Element& elem)
+time_t Storage::Loader(int value)
 {
 #ifndef REL
-    _new.insert(_new.begin(), elem);
+    _new.insert(_new.begin(), Element(value));
 #endif
 
 #ifdef REL
-    _new.insert(_new.begin(),elem);
-    _old.push_back(elem);
+    _new.insert(_new.begin(),Element(value));
+    _old.push_back(Element(value));
 #endif
-    return 0;
+    return _new.begin()->GetTime();
 }
 
 //Solution 5.1 (for use by a Copier)
-int Storage::Loader(long timestamp)
+int Storage::Loader(time_t timestamp)
 {
     _new.push_back(Element(timestamp));
     return 0;
 }
+
 //Solution 5.3
-//int Storage::Loader(const Element& elem)
+//int Storage::Loader(time_t timestamp)
 //{
 //#ifndef REL
 //
-//    _new.insert(_new.begin()+GivePos(_new, elem),elem);
+//    _new.insert(_new.begin()+GivePos(_new, timestamp),Element(timestamp));
 //
 //#endif
 //
 //#ifdef REL
-//    _new.insert(_new.begin()+GivePos(_new, elem),elem);
-//    _old.insert(_old.begin()+GivePos(_old, elem),elem);
+//    _new.insert(_new.begin()+GivePos(_new, timestamp),Element(timestamp));
+//    _old.insert(_old.begin()+GivePos(_old, timestamp),Element(timestamp));
 //#endif
-//    return 0;
+//    return GivePos(_new, timestamp);
 //}
 
 int Storage::Copier()
@@ -239,7 +253,7 @@ int Storage::Copier()
     if (!_old.empty() && !_new.empty())
     {
         //reverse for Solution 5.1
-        std::reverse(_old.begin(),_old.end());
+        //std::reverse(_old.begin(),_old.end());//5.1
         for (Element& elem : _old)
         {
             Loader(elem.GetTime()); // passing timestamp
@@ -262,9 +276,10 @@ std::string TimestampToDate(time_t timestamp)
     if (timeinfo != nullptr && std::strftime(buffer, sizeof(buffer), "%d.%m.%Y", timeinfo))
     {
         return std::string(buffer);
-    } else
+    }
+    else
     {
-        return "Invalid Timestamp"; // Handle error case
+        return "Invalid Timestamp";
     }
 }
 
@@ -286,9 +301,14 @@ bool Element::operator!=(const Element& other)
 void Storage::AddNewEES(int r_from,int r_to)
 {
     int value = r_from;
+    time_t timestamp;//5.3
+    
     while (value <= r_to)
     {
-        Loader(Element{ value });
+        Loader(value);//5.1
+        std::chrono::system_clock::time_point now = std::chrono::system_clock::now();//5.3
+        timestamp = std::chrono::system_clock::to_time_t(now);//5.3
+        //Loader(timestamp);//5.3
 
         
         value++;
@@ -333,7 +353,7 @@ void Storage::ShowStorage(int choose)
 //}
 
 //O(LogN)
-int GivePos(const std::vector<Element>& elements,const Element& elem)
+int GivePos(const std::vector<Element>& elements,time_t timestamp)
 {
     int low = 0;
     int high = elements.size();
@@ -342,9 +362,9 @@ int GivePos(const std::vector<Element>& elements,const Element& elem)
     {
         int mid = low + (high - low) / 2;
 
-        if (elements[mid].GetTime() <= elem.GetTime())
+        if (elements[mid].GetTime() <= timestamp)
         {
-            if (mid == elements.size() - 1 || elements[mid + 1].GetTime() > elem.GetTime())
+            if (mid == elements.size() - 1 || elements[mid + 1].GetTime() > timestamp)
             {
                 return mid+1;
             }
